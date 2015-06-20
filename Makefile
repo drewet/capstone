@@ -43,6 +43,10 @@ ifeq ($(CAPSTONE_USE_SYS_DYN_MEM),yes)
 CFLAGS += -DCAPSTONE_USE_SYS_DYN_MEM
 endif
 
+ifeq ($(CAPSTONE_HAS_OSXKERNEL), yes)
+CFLAGS += -DCAPSTONE_HAS_OSXKERNEL
+endif
+
 CFLAGS += $(foreach arch,$(LIBARCHS),-arch $(arch))
 LDFLAGS += $(foreach arch,$(LIBARCHS),-arch $(arch))
 
@@ -290,6 +294,7 @@ else ifeq ($(IS_CYGWIN),1)
 LIBRARY = $(BLDIR)/$(LIBNAME).$(EXT)
 else	# *nix
 LIBRARY = $(BLDIR)/lib$(LIBNAME).$(EXT)
+CFLAGS += -fvisibility=hidden
 endif
 endif
 
@@ -308,6 +313,7 @@ PKGCFGF = $(BLDIR)/$(LIBNAME).pc
 .PHONY: all clean install uninstall dist
 
 all: $(LIBRARY) $(ARCHIVE) $(PKGCFGF)
+ifeq (,$(findstring yes,$(CAPSTONE_BUILD_CORE_ONLY)))
 ifndef BUILDDIR
 	cd tests && $(MAKE)
 else
@@ -315,6 +321,7 @@ else
 endif
 ifeq ($(CAPSTONE_SHARED),yes)
 	$(INSTALL_DATA) $(LIBRARY) $(BLDIR)/tests/
+endif
 endif
 
 ifeq ($(CAPSTONE_SHARED),yes)
@@ -384,16 +391,21 @@ clean:
 	rm -f $(LIBOBJ)
 	rm -f $(BLDIR)/lib$(LIBNAME).* $(BLDIR)/$(LIBNAME).*
 	rm -f $(PKGCFGF)
+
+ifeq (,$(findstring yes,$(CAPSTONE_BUILD_CORE_ONLY)))
 	cd tests && $(MAKE) clean
 	rm -f $(BLDIR)/tests/lib$(LIBNAME).$(EXT)
+endif
 
 ifdef BUILDDIR
 	rm -rf $(BUILDDIR)
 endif
 
+ifeq (,$(findstring yes,$(CAPSTONE_BUILD_CORE_ONLY)))
 	cd bindings/python && $(MAKE) clean
 	cd bindings/java && $(MAKE) clean
 	cd bindings/ocaml && $(MAKE) clean
+endif
 
 
 TAG ?= HEAD

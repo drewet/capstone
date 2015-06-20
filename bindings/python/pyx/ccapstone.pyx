@@ -86,7 +86,7 @@ cdef class CsInsn(object):
     # return instruction's machine bytes (which should have @size bytes).
     @property
     def bytes(self):
-        return bytearray(self._raw.bytes)[:self._raw.size]
+        return bytearray(self._raw.bytes[:self._raw.size])
 
     # return instruction's mnemonic.
     @property
@@ -244,7 +244,7 @@ cdef class CsInsn(object):
 
 cdef class Cs(object):
 
-    cdef cc.csh csh
+    cdef cc.csh _csh
     cdef object _cs
 
     def __cinit__(self, _cs):
@@ -253,14 +253,14 @@ cdef class Cs(object):
             # our binding version is different from the core's API version
             raise CsError(capstone.CS_ERR_VERSION)
 
-        self.csh = <cc.csh> _cs.csh.value
+        self._csh = <cc.csh> _cs.csh.value
         self._cs = _cs
 
 
     # destructor to be called automatically when object is destroyed.
     def __dealloc__(self):
-        if self.csh:
-            status = cc.cs_close(&self.csh)
+        if self._csh:
+            status = cc.cs_close(&self._csh)
             if status != capstone.CS_ERR_OK:
                 raise CsError(status)
 
@@ -269,21 +269,22 @@ cdef class Cs(object):
     def disasm(self, code, addr, count=0):
         cdef cc.cs_insn *allinsn
 
-        cdef res = cc.cs_disasm(self.csh, code, len(code), addr, count, &allinsn)
+        cdef res = cc.cs_disasm(self._csh, code, len(code), addr, count, &allinsn)
         detail = self._cs.detail
         arch = self._cs.arch
 
-        for i from 0 <= i < res:
-            if detail:
-                dummy = CsInsn(CsDetail(arch, <size_t>allinsn[i].detail))
-            else:
-                dummy = CsInsn(None)
+        try:
+            for i from 0 <= i < res:
+                if detail:
+                    dummy = CsInsn(CsDetail(arch, <size_t>allinsn[i].detail))
+                else:
+                    dummy = CsInsn(None)
 
-            dummy._raw = allinsn[i]
-            dummy._csh = self.csh
-            yield dummy
-
-        cc.cs_free(allinsn, res)
+                dummy._raw = allinsn[i]
+                dummy._csh = self._csh
+                yield dummy
+        finally:
+            cc.cs_free(allinsn, res)
 
 
     # Light function to disassemble binary. This is about 20% faster than disasm() because
@@ -297,13 +298,14 @@ cdef class Cs(object):
             # Diet engine cannot provide @mnemonic & @op_str
             raise CsError(capstone.CS_ERR_DIET)
 
-        cdef res = cc.cs_disasm(self.csh, code, len(code), addr, count, &allinsn)
+        cdef res = cc.cs_disasm(self._csh, code, len(code), addr, count, &allinsn)
 
-        for i from 0 <= i < res:
-            insn = allinsn[i]
-            yield (insn.address, insn.size, insn.mnemonic, insn.op_str)
-
-        cc.cs_free(allinsn, res)
+        try:
+            for i from 0 <= i < res:
+                insn = allinsn[i]
+                yield (insn.address, insn.size, insn.mnemonic, insn.op_str)
+        finally:
+            cc.cs_free(allinsn, res)
 
 
 # print out debugging info

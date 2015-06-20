@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "../../inttypes.h"
+#include "../../myinttypes.h"
 
 #include "ARMAddressingModes.h"
 #include "ARMBaseInfo.h"
@@ -44,6 +44,10 @@
 
 static bool ITStatus_push_back(ARM_ITStatus *it, char v)
 {
+	if (it->size >= sizeof(it->ITStates)) {
+		// TODO: consider warning user.
+		it->size = 0;
+	}
 	it->ITStates[it->size] = v;
 	it->size++;
 
@@ -450,8 +454,6 @@ static DecodeStatus _ARM_getInstruction(cs_struct *ud, MCInst *MI, const uint8_t
 		// not enough data
 		return MCDisassembler_Fail;
 
-	ud->ITBlock.size = 0;
-
 	if (MI->flat_insn->detail) {
 		memset(&MI->flat_insn->detail->arm, 0, sizeof(cs_arm));
 		for (i = 0; i < ARR_SIZE(MI->flat_insn->detail->arm.operands); i++)
@@ -687,14 +689,12 @@ static DecodeStatus _Thumb_getInstruction(cs_struct *ud, MCInst *MI, const uint8
 	bool InITBlock;
 	unsigned Firstcond, Mask; 
 	uint32_t NEONLdStInsn, insn32, NEONDataInsn, NEONCryptoInsn, NEONv8Insn;
-	int i;
+	size_t i;
 
 	// We want to read exactly 2 bytes of data.
 	if (code_len < 2)
 		// not enough data
 		return MCDisassembler_Fail;
-
-	ud->ITBlock.size = 0;
 
 	if (MI->flat_insn->detail) {
 		memset(&MI->flat_insn->detail->arm, 0, sizeof(cs_arm));
@@ -734,8 +734,7 @@ static DecodeStatus _Thumb_getInstruction(cs_struct *ud, MCInst *MI, const uint8
 		// Nested IT blocks are UNPREDICTABLE.  Must be checked before we add
 		// the Thumb predicate.
 		if (MCInst_getOpcode(MI) == ARM_t2IT && ITStatus_instrInITBlock(&(ud->ITBlock)))
-			result = MCDisassembler_SoftFail;
-
+			return MCDisassembler_SoftFail;
 		Check(&result, AddThumbPredicate(ud, MI));
 
 		// If we find an IT instruction, we need to parse its condition
@@ -1773,6 +1772,7 @@ static DecodeStatus DecodeAddrMode3Instruction(MCInst *Inst, unsigned Insn,
 	}
 
 	if (writeback) { // Writeback
+		Inst->writeback = true;
 		if (P)
 			U |= ARMII_IndexModePre << 9;
 		else
