@@ -68,8 +68,8 @@ function build {
 
 	${MAKE} clean
 
-	if [ ${CC}x != x ]; then
-		${MAKE} CC=$CC $*
+	if [ -n "$CC" ]; then
+		${MAKE} CC="$CC" $*
 	else
 		${MAKE} $*
 	fi
@@ -101,14 +101,14 @@ function install {
 		fi
 	else	# not OSX
 		if test -d /usr/lib64; then
-			if [ ${CC}x != x ]; then
-				${MAKE} LIBDIRARCH=lib64 CC=$CC install
+			if [ -n "$CC" ]; then
+				${MAKE} LIBDIRARCH=lib64 CC="$CC" install
 			else
 				${MAKE} LIBDIRARCH=lib64 install
 			fi
 		else
-			if [ ${CC}x != x ]; then
-				${MAKE} CC=$CC install
+			if [ -n "$CC" ]; then
+				${MAKE} CC="$CC" install
 			else
 				${MAKE} install
 			fi
@@ -169,5 +169,6 @@ case "$TARGET" in
   "ios_armv7" ) build_iOS armv7 $*;;
   "ios_armv7s" ) build_iOS armv7s $*;;
   "ios_arm64" ) build_iOS arm64 $*;;
+  "osx-kernel" ) CAPSTONE_USE_SYS_DYN_MEM=yes CAPSTONE_HAS_OSXKERNEL=yes CAPSTONE_ARCHS=x86 CAPSTONE_SHARED=no CAPSTONE_BUILD_CORE_ONLY=yes build $*;;
   * ) echo "Usage: make.sh [nix32|cross-win32|cross-win64|cygwin-mingw32|cygwin-mingw64|ios|ios_armv7|ios_armv7s|ios_arm64|cross-android arm|cross-android arm64|clang|gcc|install|uninstall]"; exit 1;;
 esac
